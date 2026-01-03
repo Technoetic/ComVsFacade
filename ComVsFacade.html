@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus City: Composite vs Facade</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #050510;
+            --glass-bg: rgba(20, 30, 50, 0.6);
+            --glass-border: rgba(100, 200, 255, 0.1);
+            --neon-blue: #00f0ff;
+            --neon-purple: #bc13fe;
+            --neon-green: #0aff0a;
+            --neon-red: #ff0055;
+            --text-main: #ffffff;
+            --text-muted: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.1) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(188, 19, 254, 0.1) 0%, transparent 20%);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--glass-border);
+            background: rgba(5, 5, 16, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            background: linear-gradient(to right, var(--neon-blue), var(--neon-purple));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 1.5rem;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-left: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            padding: 2rem;
+            overflow: hidden;
+        }
+
+        /* Glass Panel */
+        .glass-panel {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            backdrop-filter: blur(20px);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--neon-blue);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .badge-composite {
+            background: rgba(0, 240, 255, 0.15);
+            color: var(--neon-blue);
+            border: 1px solid var(--neon-blue);
+        }
+
+        .badge-facade {
+            background: rgba(188, 19, 254, 0.15);
+            color: var(--neon-purple);
+            border: 1px solid var(--neon-purple);
+        }
+
+        /* Composite View (Tree) */
+        .tree-container {
+            flex: 1;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .node {
+            margin-left: 1.5rem;
+            position: relative;
+        }
+
+        .node::before {
+            content: '';
+            position: absolute;
+            left: -1rem;
+            top: 1rem;
+            width: 1rem;
+            height: 1px;
+            background: var(--glass-border);
+        }
+
+        .node::after {
+            content: '';
+            position: absolute;
+            left: -1rem;
+            top: -0.5rem;
+            bottom: 1rem;
+            /* Adjust tree line height */
+            width: 1px;
+            background: var(--glass-border);
+        }
+
+        /* Remove vertical line for last child to make it look cleaner */
+        .node:last-child::after {
+            bottom: auto;
+            height: 1.6rem;
+            /* Connect to the horizontal line only */
+        }
+
+        .node-content {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 0.8rem;
+            margin: 0.2rem 0;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .node-content:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .node-icon {
+            margin-right: 0.8rem;
+            font-size: 1.1rem;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #555;
+            margin-left: auto;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            transition: all 0.5s ease;
+        }
+
+        .status-on {
+            background: var(--neon-green);
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        .status-off {
+            background: var(--neon-red);
+            box-shadow: 0 0 8px var(--neon-red);
+        }
+
+        .status-dim {
+            background: #ffd700;
+            box-shadow: 0 0 8px #ffd700;
+        }
+
+        .status-locked {
+            background: var(--neon-red);
+            border: 2px solid white;
+        }
+
+        /* Facade Controls */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .control-btn.active {
+            border-color: var(--neon-purple);
+            background: rgba(188, 19, 254, 0.1);
+        }
+
+        .control-btn h3 {
+            font-size: 1rem;
+            margin-bottom: 0.3rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .control-btn p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .log-panel {
+            margin-top: 1.5rem;
+            flex: 1;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: #4dff4d;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            opacity: 1;
+        }
+
+        .log-entry.command {
+            color: #d15eff;
+            font-weight: bold;
+        }
+
+        /* Legend/Explanation */
+        .pattern-explanation {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--glass-border);
+            line-height: 1.4;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div style="display: flex; align-items: baseline;">
+            <h1>넥서스 시티 [NEXUS CITY]</h1>
+            <span class="subtitle">인프라 관리 시스템</span>
+        </div>
+        <div style="text-align: right; font-size: 0.8rem; color: var(--text-muted);">
+            시스템 상태: <span style="color: var(--neon-green)">온라인 [ONLINE]</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left: Composite Pattern Visualization -->
+        <div class="glass-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span>🏙️ 인프라 그리드</span>
+                    <span class="badge badge-composite">Composite 패턴</span>
+                </div>
+                <button onclick="infrastructure.reset()"
+                    style="background:none; border:none; color:var(--text-muted); cursor:pointer;">초기화 [Reset]</button>
+            </div>
+            <div id="tree-root" class="tree-container">
+                <!-- Tree generated by JS -->
+            </div>
+            <div class="pattern-explanation">
+                <strong>Composite 패턴 (컴포지트):</strong> 개별 객체(가로등, 게이트)와 객체들의 집합(구역, 섹터)을 <strong>동일하게 취급</strong>합니다.
+                구역(District)을 클릭하면 하위의 모든 장치들에게 명령이 전파되는 계층 구조를 가집니다.
+            </div>
+        </div>
+
+        <!-- Right: Facade Pattern Controls -->
+        <div class="glass-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span>🎛️ 도시 제어 센터</span>
+                    <span class="badge badge-facade">Facade 패턴</span>
+                </div>
+            </div>
+
+            <div class="controls-grid">
+                <button class="control-btn" onclick="cityFacade.activateDayMode()">
+                    <h3>☀️ 주간 모드 (Day)</h3>
+                    <p>조명 OFF, 게이트 개방, 평시 교통</p>
+                </button>
+
+                <button class="control-btn" onclick="cityFacade.activateNightMode()">
+                    <h3>🌙 야간 모드 (Night)</h3>
+                    <p>조명 ON, 거주 구역 게이트 잠금</p>
+                </button>
+
+                <button class="control-btn" onclick="cityFacade.activateLockdown()">
+                    <h3>🚨 긴급 봉쇄 (Emergency)</h3>
+                    <p>모든 게이트 폐쇄, 조명 적색, 교통 차단</p>
+                </button>
+
+                <button class="control-btn" onclick="cityFacade.activateFestival()">
+                    <h3>🎉 축제 모드 (Festival)</h3>
+                    <p>도심 조명 디밍/컬러, 게이트 전면 개방</p>
+                </button>
+            </div>
+
+            <div class="log-panel" id="system-log">
+                <div class="log-entry">> 시스템 초기화 완료...</div>
+                <div class="log-entry">> 명령 대기 중...</div>
+            </div>
+
+            <div class="pattern-explanation" style="margin-top: 1rem;">
+                <strong>Facade 패턴 (퍼사드):</strong> 복잡한 하위 시스템(여기서는 도시 전체의 수많은 장치들)을 다루기 위한 <strong>단순화된 통합
+                    인터페이스</strong>를 제공합니다. 버튼 하나로 '야간 모드' 같은 복잡한 시나리오를 실행할 수 있습니다.
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- Utilities ---
+        const log = (msg, type = 'info') => {
+            const panel = document.getElementById('system-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerText = `> ${msg}`;
+            panel.appendChild(entry);
+            panel.scrollTop = panel.scrollHeight;
+        };
+
+        // --- Composite Pattern ---
+
+        // Component Interface
+        class InfrastructureNode {
+            constructor(name) {
+                this.name = name;
+                this.parent = null;
+            }
+
+            // Common operations
+            toggle() { }
+            setStatus(status) { }
+            getElement() { return this.element; }
+
+            render(container) {
+                this.container = container;
+                // Implementation specific to leaf/composite
+            }
+        }
+
+        // Leaf: Specific Device (Light, Gate, etc.)
+        class Device extends InfrastructureNode {
+            constructor(name, type, icon) {
+                super(name);
+                this.type = type;
+                this.icon = icon;
+                this.status = 'OFF'; // OFF, ON, DIM, LOCKED, RED
+            }
+
+            setStatus(status) {
+                this.status = status;
+                log(`${this.type} [${this.name}] set to ${status}`);
+                this.updateView();
+            }
+
+            render(container) {
+                const el = document.createElement('div');
+                el.className = 'node';
+                el.innerHTML = `
+                <div class="node-content" onclick="deviceClicked('${this.name}')">
+                    <span class="node-icon">${this.icon}</span>
+                    <span>${this.name}</span>
+                    <div class="status-indicator" id="status-${this.name}"></div>
+                </div>
+            `;
+                container.appendChild(el);
+                this.updateView();
+            }
+
+            updateView() {
+                const indicator = document.getElementById(`status-${this.name}`);
+                if (!indicator) return;
+
+                indicator.className = 'status-indicator'; // reset
+                indicator.style.background = ''; // reset inline style
+                indicator.style.boxShadow = ''; // reset inline style
+
+                if (this.status === 'ON') indicator.classList.add('status-on');
+                else if (this.status === 'OFF') indicator.classList.add('status-off');
+                else if (this.status === 'DIM') indicator.classList.add('status-dim');
+                else if (this.status === 'LOCKED') indicator.classList.add('status-locked');
+                else if (this.status === 'RED') { indicator.style.background = 'var(--neon-red)'; indicator.style.boxShadow = '0 0 10px var(--neon-red)'; }
+            }
+        }
+
+        // Composite: Zone (District, Sector, etc.)
+        class Zone extends InfrastructureNode {
+            constructor(name, type = 'District') {
+                super(name);
+                this.type = type;
+                this.children = [];
+            }
+
+            add(node) {
+                this.children.push(node);
+                node.parent = this;
+            }
+
+            // Recursive operation
+            setStatus(status) {
+                log(`Zone [${this.name}] broadcasting ${status}...`);
+                this.children.forEach(child => child.setStatus(status));
+                this.updateView(status);
+            }
+
+            render(container) {
+                const el = document.createElement('div');
+                el.className = 'node';
+
+                // Allow clicking the zone to toggle all children
+                // Simple toggle logic for demo: defaults to ON if mixed, or OFF if ON.
+                el.innerHTML = `
+                 <div class="node-content" onclick="zoneClicked('${this.name}')">
+                    <span class="node-icon">🏢</span>
+                    <span style="font-weight:bold; color:var(--neon-blue)">${this.name}</span>
+                 </div>
+            `;
+
+                const childrenContainer = document.createElement('div');
+                // No margin for children container itself, the .node class handles indentation
+                el.appendChild(childrenContainer);
+                container.appendChild(el);
+
+                this.children.forEach(child => child.render(childrenContainer));
+            }
+
+            updateView(status) {
+                // Visual feedback on the zone itself (optional, maybe a flash)
+            }
+        }
+
+        // Global registry for click handlers
+        const registry = {};
+
+        function register(node) {
+            registry[node.name] = node;
+            if (node.children) {
+                node.children.forEach(register);
+            }
+        }
+
+        window.deviceClicked = (name) => {
+            const node = registry[name];
+            // Toggle simple state
+            const newStatus = node.status === 'ON' ? 'OFF' : 'ON';
+            node.setStatus(newStatus);
+        };
+
+        window.zoneClicked = (name) => {
+            const node = registry[name];
+            // Toggle Logic: Check current state of first child (heuristic)
+            const firstChildStatus = node.children.length > 0 ? node.children[0].status : 'OFF';
+            // If first child is ON (or similar active state), turn OFF. Else turn ON.
+            const newStatus = (firstChildStatus === 'ON' || firstChildStatus === 'DIM' || firstChildStatus === 'LOCKED') ? 'OFF' : 'ON';
+            node.setStatus(newStatus);
+        };
+
+
+        // --- Facade Pattern ---
+
+        class CityControlFacade {
+            constructor(rootZone) {
+                this.root = rootZone;
+            }
+
+            // Helper to find nodes by type (simulating complex subsystem query)
+            _findAll(type) {
+                const results = [];
+                const traverse = (node) => {
+                    if (node instanceof Device && node.type === type) results.push(node);
+                    if (node instanceof Zone) node.children.forEach(traverse);
+                };
+                traverse(this.root);
+                return results;
+            }
+
+            activateDayMode() {
+                log('FACADE: 주간 모드 [Day Mode] 활성화', 'command');
+                // Logic: Lights OFF, Gates UNLOCKED
+                this._findAll('StreetLight').forEach(n => n.setStatus('OFF'));
+                this._findAll('SecurityGate').forEach(n => n.setStatus('ON')); // Unlocked/Open implies On/Green
+                this._findAll('TrafficNode').forEach(n => n.setStatus('ON'));
+            }
+
+            activateNightMode() {
+                log('FACADE: 야간 모드 [Night Mode] 활성화', 'command');
+                // Logic: Lights ON, Residential Gates LOCKED
+                this._findAll('StreetLight').forEach(n => n.setStatus('ON'));
+                // Assuming we had zone info, but for now lock all gates
+                this._findAll('SecurityGate').forEach(n => n.setStatus('LOCKED'));
+            }
+
+            activateLockdown() {
+                log('FACADE: !!! 긴급 봉쇄 [LOCKDOWN] !!!', 'command');
+                this._findAll('SecurityGate').forEach(n => n.setStatus('LOCKED'));
+                this._findAll('StreetLight').forEach(n => n.setStatus('RED'));
+                this._findAll('TrafficNode').forEach(n => n.setStatus('OFF'));
+            }
+
+            activateFestival() {
+                log('FACADE: 축제 모드 [Festival] 시작', 'command');
+                this._findAll('StreetLight').forEach(n => n.setStatus('DIM')); // Mood lighting
+                this._findAll('SecurityGate').forEach(n => n.setStatus('ON')); // Open flow
+            }
+        }
+
+
+        // --- Initialization ---
+
+        // 1. Build Composite Tree
+        const city = new Zone('넥서스 시티 [Nexus City]', 'City');
+
+        const downtown = new Zone('도심 구역 [Downtown]');
+        downtown.add(new Device('메인 스트리트 조명 1', 'StreetLight', '💡'));
+        downtown.add(new Device('메인 스트리트 조명 2', 'StreetLight', '💡'));
+        downtown.add(new Device('중앙 허브 게이트', 'SecurityGate', '🚧'));
+
+        const residential = new Zone('거주 구역 [Residential]');
+        residential.add(new Device('파크 레인 조명', 'StreetLight', '💡'));
+        residential.add(new Device('아파트 단지 게이트', 'SecurityGate', '🚧'));
+
+        const industrial = new Zone('산업 구역 [Industrial]');
+        industrial.add(new Device('공장 전력 노드', 'TrafficNode', '⚡'));
+        industrial.add(new Device('화물 게이트', 'SecurityGate', '🚧'));
+
+        city.add(downtown);
+        city.add(residential);
+        city.add(industrial);
+
+        // Register all for click events
+        register(city);
+
+        // Render Logic
+        const treeRoot = document.getElementById('tree-root');
+        city.render(treeRoot);
+
+        // 2. Initialize Facade
+        const cityFacade = new CityControlFacade(city);
+        window.cityFacade = cityFacade; // Expose to window for HTML buttons
+
+        // Expose reset for button
+        window.infrastructure = {
+            reset: () => {
+                log('시스템 리셋 중... [System Reset]');
+                city.setStatus('OFF');
+            }
+        };
+
+    </script>
+
+</body>
+
+</html>
